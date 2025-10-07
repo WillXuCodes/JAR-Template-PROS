@@ -1,3 +1,5 @@
+#pragma once
+
 float reduce_0_to_360(float angle);
 
 float reduce_negative_180_to_180(float angle);
@@ -25,3 +27,7 @@ float left_voltage_scaling(float drive_output, float heading_output);
 float right_voltage_scaling(float drive_output, float heading_output);
 
 float clamp_min_voltage(float drive_output, float drive_min_voltage);
+
+float pure_analog_byte_to_pct( float input );
+
+#define UNIT_TO_MILLIS(in) ((in) * 1000.0)

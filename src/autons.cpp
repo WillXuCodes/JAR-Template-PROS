@@ -90,13 +90,13 @@ void full_test(){
 void odom_test(){
   chassis.set_coordinates(0, 0, 0);
   while(1){
-    Brain.Screen.clearScreen();
-    Brain.Screen.printAt(5,20, "X: %f", chassis.get_X_position());
-    Brain.Screen.printAt(5,40, "Y: %f", chassis.get_Y_position());
-    Brain.Screen.printAt(5,60, "Heading: %f", chassis.get_absolute_heading());
-    Brain.Screen.printAt(5,80, "ForwardTracker: %f", chassis.get_ForwardTracker_position());
-    Brain.Screen.printAt(5,100, "SidewaysTracker: %f", chassis.get_SidewaysTracker_position());
-    task::sleep(20);
+    pros::Screen::clearScreen();
+    pros::Screen::print(pros::E_TEXT_MEDIUM, 5,20, "X: %f", chassis.get_X_position());
+    pros::Screen::print(pros::E_TEXT_MEDIUM, 5,40, "Y: %f", chassis.get_Y_position());
+    pros::Screen::print(pros::E_TEXT_MEDIUM, 5,60, "Heading: %f", chassis.get_absolute_heading());
+    pros::Screen::print(pros::E_TEXT_MEDIUM, 5,80, "ForwardTracker: %f", chassis.get_ForwardTracker_position());
+    pros::Screen::print(pros::E_TEXT_MEDIUM, 5,100, "SidewaysTracker: %f", chassis.get_SidewaysTracker_position());
+    pros::delay(20);
   }
 }
 

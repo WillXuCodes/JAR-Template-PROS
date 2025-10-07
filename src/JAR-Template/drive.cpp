@@ -1,4 +1,7 @@
-#include "vex.h"
+#include "api.h"
+#include "drive.h"
+#include "util.h"
+#include "PID.h"
 
 /**
  * Drive constructor for the chassis.
@@ -25,7 +28,7 @@
  * @param SidewaysTracker_center_distance Vertical distance in inches.
  */
 
-Drive::Drive(enum::drive_setup drive_setup, motor_group DriveL, motor_group DriveR, 
+Drive::Drive(enum::drive_setup drive_setup, pros::MotorGroup DriveL, pros::MotorGroup DriveR, 
 int gyro_port, float wheel_diameter, float wheel_ratio, float gyro_scale, 
 int DriveLF_port, int DriveRF_port, int DriveLB_port, int DriveRB_port, 
 int ForwardTracker_port, float ForwardTracker_diameter, float ForwardTracker_center_distance, 
@@ -43,16 +46,22 @@ int SidewaysTracker_port, float SidewaysTracker_diameter, float SidewaysTracker_
   drive_setup(drive_setup),
   DriveL(DriveL),
   DriveR(DriveR),
-  Gyro(inertial(gyro_port)),
-  DriveLF(abs(DriveLF_port), is_reversed(DriveLF_port)),
-  DriveRF(abs(DriveRF_port), is_reversed(DriveRF_port)),
-  DriveLB(abs(DriveLB_port), is_reversed(DriveLB_port)),
-  DriveRB(abs(DriveRB_port), is_reversed(DriveRB_port)),
+  Gyro(pros::IMU(gyro_port)),
+  DriveLF(DriveLF_port),
+  DriveRF(DriveRF_port),
+  DriveLB(DriveLB_port),
+  DriveRB(DriveRB_port),
   R_ForwardTracker(ForwardTracker_port),
   R_SidewaysTracker(SidewaysTracker_port),
-  E_ForwardTracker(ThreeWire.Port[to_port(ForwardTracker_port)]),
-  E_SidewaysTracker(ThreeWire.Port[to_port(SidewaysTracker_port)])
+  E_ForwardTracker(ForwardTracker_port, ForwardTracker_port + 1),
+  E_SidewaysTracker(SidewaysTracker_port, SidewaysTracker_port + 1),
+  controller(pros::E_CONTROLLER_MASTER ),
+  odom_task(pros::Task(position_track_task))
 {
+    DriveL.set_encoder_units_all( pros::MotorEncoderUnits::deg );
+    DriveR.set_encoder_units_all( pros::MotorEncoderUnits::deg );
+    DriveLF.set_encoder_units( pros::MotorEncoderUnits::deg );
+    
     if (drive_setup == TANK_ONE_FORWARD_ENCODER || drive_setup == TANK_ONE_FORWARD_ROTATION || drive_setup == ZERO_TRACKER_ODOM){
       odom.set_physical_distances(ForwardTracker_center_distance, 0);
     } 
@@ -71,8 +80,8 @@ int SidewaysTracker_port, float SidewaysTracker_diameter, float SidewaysTracker_
  */
 
 void Drive::drive_with_voltage(float leftVoltage, float rightVoltage){
-  DriveL.spin(fwd, leftVoltage, volt);
-  DriveR.spin(fwd, rightVoltage,volt);
+  DriveL.move_voltage(leftVoltage * 1000.0);
+  DriveR.move_voltage(rightVoltage * 1000.0);
 }
 
 /**
@@ -210,7 +219,7 @@ void Drive::set_swing_exit_conditions(float swing_settle_error, float swing_sett
  */
 
 float Drive::get_absolute_heading(){ 
-  return( reduce_0_to_360( Gyro.rotation()*360.0/gyro_scale ) ); 
+  return( reduce_0_to_360( Gyro.get_rotation()*360.0/gyro_scale ) ); 
 }
 
 /**
@@ -220,7 +229,7 @@ float Drive::get_absolute_heading(){
  */
 
 float Drive::get_left_position_in(){
-  return( DriveL.position(deg)*drive_in_to_deg_ratio );
+  return( DriveL.get_position()*drive_in_to_deg_ratio );
 }
 
 /**
@@ -230,7 +239,7 @@ float Drive::get_left_position_in(){
  */
 
 float Drive::get_right_position_in(){
-  return( DriveR.position(deg)*drive_in_to_deg_ratio );
+  return( DriveR.get_position()*drive_in_to_deg_ratio );
 }
 
 /**
@@ -239,9 +248,11 @@ float Drive::get_right_position_in(){
  * @param mode hold, brake, or stop
  */
 
-void Drive::drive_stop(vex::brakeType mode){
-  DriveL.stop(mode);
-  DriveR.stop(mode);
+void Drive::drive_stop(pros::MotorBrake mode){
+  DriveL.set_brake_mode_all(mode);
+  DriveR.set_brake_mode_all(mode);
+  DriveL.brake();
+  DriveR.brake();
 }
 
 /**
@@ -271,7 +282,7 @@ void Drive::turn_to_angle(float angle, float turn_max_voltage, float turn_settle
     float output = turnPID.compute(error);
     output = clamp(output, -turn_max_voltage, turn_max_voltage);
     drive_with_voltage(output, -output);
-    task::sleep(10);
+    pros::delay(10);
   }
 }
 
@@ -319,7 +330,7 @@ void Drive::drive_distance(float distance, float heading, float drive_max_voltag
     heading_output = clamp(heading_output, -heading_max_voltage, heading_max_voltage);
 
     drive_with_voltage(drive_output+heading_output, drive_output-heading_output);
-    task::sleep(10);
+    pros::delay(10);
   }
 }
 
@@ -341,9 +352,9 @@ void Drive::left_swing_to_angle(float angle, float swing_max_voltage, float swin
     float error = reduce_negative_180_to_180(angle - get_absolute_heading());
     float output = swingPID.compute(error);
     output = clamp(output, -turn_max_voltage, turn_max_voltage);
-    DriveL.spin(fwd, output, volt);
-    DriveR.stop(hold);
-    task::sleep(10);
+    DriveL.move_voltage( output );
+    DriveR.brake();
+    pros::delay(10);
   }
 }
 
@@ -357,9 +368,9 @@ void Drive::right_swing_to_angle(float angle, float swing_max_voltage, float swi
     float error = reduce_negative_180_to_180(angle - get_absolute_heading());
     float output = swingPID.compute(error);
     output = clamp(output, -turn_max_voltage, turn_max_voltage);
-    DriveR.spin(reverse, output, volt);
-    DriveL.stop(hold);
-    task::sleep(10);
+    DriveR.move( -output );
+    DriveL.brake();
+    pros::delay(10);
   }
 }
 
@@ -374,9 +385,9 @@ float Drive::get_ForwardTracker_position(){
     return(get_right_position_in());
   }
   if (drive_setup==TANK_ONE_FORWARD_ENCODER || drive_setup == TANK_TWO_ENCODER || drive_setup == HOLONOMIC_TWO_ENCODER){
-    return(E_ForwardTracker.position(deg)*ForwardTracker_in_to_deg_ratio);
+    return(E_ForwardTracker.get_value()*ForwardTracker_in_to_deg_ratio);
   }else{
-    return(R_ForwardTracker.position(deg)*ForwardTracker_in_to_deg_ratio);
+    return(R_ForwardTracker.get_position()*ForwardTracker_in_to_deg_ratio);
   }
 }
 
@@ -390,9 +401,9 @@ float Drive::get_SidewaysTracker_position(){
   if (drive_setup==TANK_ONE_FORWARD_ENCODER || drive_setup == TANK_ONE_FORWARD_ROTATION || drive_setup == ZERO_TRACKER_ODOM){
     return(0);
   }else if (drive_setup == TANK_TWO_ENCODER || drive_setup == HOLONOMIC_TWO_ENCODER || drive_setup == TANK_ONE_SIDEWAYS_ENCODER){
-    return(E_SidewaysTracker.position(deg)*SidewaysTracker_in_to_deg_ratio);
+    return(E_SidewaysTracker.get_value()*SidewaysTracker_in_to_deg_ratio);
   }else{
-    return(R_SidewaysTracker.position(deg)*SidewaysTracker_in_to_deg_ratio);
+    return(R_SidewaysTracker.get_position()*SidewaysTracker_in_to_deg_ratio);
   }
 }
 
@@ -403,7 +414,7 @@ float Drive::get_SidewaysTracker_position(){
 void Drive::position_track(){
   while(1){
     odom.update_position(get_ForwardTracker_position(), get_SidewaysTracker_position(), get_absolute_heading());
-    task::sleep(5);
+    pros::delay(5);
   }
 }
 
@@ -417,7 +428,7 @@ void Drive::position_track(){
  */
 
 void Drive::set_heading(float orientation_deg){
-  Gyro.setRotation(orientation_deg*gyro_scale/360.0, deg);
+  Gyro.set_rotation(orientation_deg*gyro_scale/360.0 );
 }
 
 /**
@@ -433,7 +444,6 @@ void Drive::set_heading(float orientation_deg){
 void Drive::set_coordinates(float X_position, float Y_position, float orientation_deg){
   odom.set_position(X_position, Y_position, orientation_deg, get_ForwardTracker_position(), get_SidewaysTracker_position());
   set_heading(orientation_deg);
-  odom_task = task(position_track_task);
 }
 
 /**
@@ -508,7 +518,7 @@ void Drive::drive_to_point(float X_position, float Y_position, float drive_min_v
     drive_output = clamp_min_voltage(drive_output, drive_min_voltage);
 
     drive_with_voltage(left_voltage_scaling(drive_output, heading_output), right_voltage_scaling(drive_output, heading_output));
-    task::sleep(10);
+    pros::delay(10);
   }
 }
 
@@ -593,7 +603,7 @@ void Drive::drive_to_pose(float X_position, float Y_position, float angle, float
     drive_output = clamp_min_voltage(drive_output, drive_min_voltage);
 
     drive_with_voltage(left_voltage_scaling(drive_output, heading_output), right_voltage_scaling(drive_output, heading_output));
-    task::sleep(10);
+    pros::delay(10);
   }
 }
 
@@ -628,7 +638,7 @@ void Drive::turn_to_point(float X_position, float Y_position, float extra_angle_
     float output = turnPID.compute(error);
     output = clamp(output, -turn_max_voltage, turn_max_voltage);
     drive_with_voltage(output, -output);
-    task::sleep(10);
+    pros::delay(10);
   }
 }
 
@@ -675,11 +685,11 @@ void Drive::holonomic_drive_to_pose(float X_position, float Y_position, float an
 
     float heading_error = atan2(Y_position-get_Y_position(), X_position-get_X_position());
 
-    DriveLF.spin(fwd, drive_output*cos(to_rad(get_absolute_heading()) + heading_error - M_PI/4) + turn_output, volt);
-    DriveLB.spin(fwd, drive_output*cos(-to_rad(get_absolute_heading()) - heading_error + 3*M_PI/4) + turn_output, volt);
-    DriveRB.spin(fwd, drive_output*cos(to_rad(get_absolute_heading()) + heading_error - M_PI/4) - turn_output, volt);
-    DriveRF.spin(fwd, drive_output*cos(-to_rad(get_absolute_heading()) - heading_error + 3*M_PI/4) - turn_output, volt);
-    task::sleep(10);
+    DriveLF.move_voltage( drive_output*cos(to_rad(get_absolute_heading()) + heading_error - M_PI/4) + turn_output );
+    DriveLB.move_voltage( drive_output*cos(-to_rad(get_absolute_heading()) - heading_error + 3*M_PI/4) + turn_output );
+    DriveRB.move_voltage( drive_output*cos(to_rad(get_absolute_heading()) + heading_error - M_PI/4) - turn_output );
+    DriveRF.move_voltage( drive_output*cos(-to_rad(get_absolute_heading()) - heading_error + 3*M_PI/4) - turn_output );
+    pros::delay(10);
   }
 }
 
@@ -689,10 +699,10 @@ void Drive::holonomic_drive_to_pose(float X_position, float Y_position, float an
  */
 
 void Drive::control_arcade(){
-  float throttle = deadband(controller(primary).Axis3.value(), 5);
-  float turn = deadband(controller(primary).Axis1.value(), 5);
-  DriveL.spin(fwd, to_volt(throttle+turn), volt);
-  DriveR.spin(fwd, to_volt(throttle-turn), volt);
+  float throttle = deadband(controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y), 5);
+  float turn = deadband(controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X), 5);
+  DriveL.move_voltage( UNIT_TO_MILLIS( to_volt(throttle+turn)) );
+  DriveR.move_voltage( UNIT_TO_MILLIS( to_volt(throttle-turn)) );
 }
 
 /**
@@ -701,13 +711,18 @@ void Drive::control_arcade(){
  */
 
 void Drive::control_holonomic(){
-  float throttle = deadband(controller(primary).Axis3.value(), 5);
-  float turn = deadband(controller(primary).Axis1.value(), 5);
-  float strafe = deadband(controller(primary).Axis4.value(), 5);
-  DriveLF.spin(fwd, to_volt(throttle+turn+strafe), volt);
-  DriveRF.spin(fwd, to_volt(throttle-turn-strafe), volt);
-  DriveLB.spin(fwd, to_volt(throttle+turn-strafe), volt);
-  DriveRB.spin(fwd, to_volt(throttle-turn+strafe), volt);
+  float throttle = deadband(controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y), 5);
+  float turn = deadband(controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X), 5);
+  float strafe = deadband(controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X), 5);\
+
+  throttle = pure_analog_byte_to_pct( throttle );
+  turn = pure_analog_byte_to_pct( turn );
+  strafe = pure_analog_byte_to_pct( strafe );
+
+  DriveLF.move_voltage( UNIT_TO_MILLIS( to_volt(throttle+turn+strafe)) );
+  DriveRF.move_voltage( UNIT_TO_MILLIS( to_volt(throttle-turn-strafe)) );
+  DriveLB.move_voltage( UNIT_TO_MILLIS( to_volt(throttle+turn-strafe)) );
+  DriveRB.move_voltage( UNIT_TO_MILLIS( to_volt(throttle-turn+strafe)) );
 }
 
 /**
@@ -716,10 +731,10 @@ void Drive::control_holonomic(){
  */
 
 void Drive::control_tank(){
-  float leftthrottle = deadband(controller(primary).Axis3.value(), 5);
-  float rightthrottle = deadband(controller(primary).Axis2.value(), 5);
-  DriveL.spin(fwd, to_volt(leftthrottle), volt);
-  DriveR.spin(fwd, to_volt(rightthrottle), volt);
+  float leftthrottle = deadband(controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y), 5);
+  float rightthrottle = deadband(controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_Y), 5);
+  DriveL.move_voltage( UNIT_TO_MILLIS( to_volt(leftthrottle)) );
+  DriveR.move_voltage( UNIT_TO_MILLIS( to_volt(rightthrottle)) );
 }
 
 /**

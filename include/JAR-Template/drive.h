@@ -1,5 +1,6 @@
 #pragma once
-#include "vex.h"
+#include "api.h"
+#include "odom.h"
 
 enum drive_setup {ZERO_TRACKER_NO_ODOM, ZERO_TRACKER_ODOM, TANK_ONE_FORWARD_ENCODER, TANK_ONE_FORWARD_ROTATION, 
 TANK_ONE_SIDEWAYS_ENCODER, TANK_ONE_SIDEWAYS_ROTATION, TANK_TWO_ENCODER, TANK_TWO_ROTATION, 
@@ -23,21 +24,20 @@ private:
   float SidewaysTracker_center_distance;
   float SidewaysTracker_diameter;
   float SidewaysTracker_in_to_deg_ratio;
-  vex:: triport ThreeWire = vex::triport(vex::PORT22);
 
 public: 
   drive_setup drive_setup = ZERO_TRACKER_NO_ODOM;
-  motor_group DriveL;
-  motor_group DriveR;
-  inertial Gyro;
-  motor DriveLF;
-  motor DriveRF;
-  motor DriveLB;
-  motor DriveRB;
-  rotation R_ForwardTracker;
-  rotation R_SidewaysTracker;
-  encoder E_ForwardTracker;
-  encoder E_SidewaysTracker;
+  pros::v5::MotorGroup& DriveL;
+  pros::v5::MotorGroup& DriveR;
+  pros::v5::IMU Gyro;
+  pros::v5::Motor DriveLF;
+  pros::v5::Motor DriveRF;
+  pros::v5::Motor DriveLB;
+  pros::v5::Motor DriveRB;
+  pros::v5::Rotation R_ForwardTracker;
+  pros::v5::Rotation R_SidewaysTracker;
+  pros::adi::Encoder E_ForwardTracker;
+  pros::adi::Encoder E_SidewaysTracker;
 
   float turn_max_voltage;
   float turn_kp;
@@ -79,7 +79,7 @@ public:
   float boomerang_lead;
   float boomerang_setback;
 
-  Drive(enum::drive_setup drive_setup, motor_group DriveL, motor_group DriveR, int gyro_port, float wheel_diameter, float wheel_ratio, float gyro_scale, int DriveLF_port, int DriveRF_port, int DriveLB_port, int DriveRB_port, int ForwardTracker_port, float ForwardTracker_diameter, float ForwardTracker_center_distance, int SidewaysTracker_port, float SidewaysTracker_diameter, float SidewaysTracker_center_distance);
+  Drive(enum::drive_setup drive_setup, pros::MotorGroup DriveL, pros::MotorGroup DriveR, int gyro_port, float wheel_diameter, float wheel_ratio, float gyro_scale, int DriveLF_port, int DriveRF_port, int DriveLB_port, int DriveRB_port, int ForwardTracker_port, float ForwardTracker_diameter, float ForwardTracker_center_distance, int SidewaysTracker_port, float SidewaysTracker_diameter, float SidewaysTracker_center_distance);
 
   void drive_with_voltage(float leftVoltage, float rightVoltage);
 
@@ -121,11 +121,11 @@ public:
   void set_heading(float orientation_deg);
   void position_track();
   static int position_track_task();
-  vex::task odom_task;
+  pros::Task odom_task;
   float get_X_position();
   float get_Y_position();
 
-  void drive_stop(vex::brakeType mode);
+  void drive_stop(pros::MotorBrake mode);
 
   void drive_to_point(float X_position, float Y_position);
   void drive_to_point(float X_position, float Y_position, float drive_min_voltage, float drive_max_voltage, float heading_max_voltage);
@@ -152,4 +152,7 @@ public:
   void control_arcade();
   void control_tank();
   void control_holonomic();
+
+  private:
+  pros::Controller controller;
 };

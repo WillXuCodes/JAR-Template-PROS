@@ -1,4 +1,5 @@
-#include "vex.h"
+#include "api.h"
+#include "util.h"
 
 /**
  * Converts an angle to an equivalent one in the range [0, 360).
@@ -216,4 +217,9 @@ float clamp_min_voltage(float drive_output, float drive_min_voltage){
     return drive_min_voltage;
   }
   return drive_output;
+}
+
+float pure_analog_byte_to_pct( float input )
+{
+  return ( input * 100.0 / 127.0 );
 }
