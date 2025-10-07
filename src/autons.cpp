@@ -1,4 +1,9 @@
-#include "vex.h"
+#include "api.h"
+#include "autons.h"
+#include "JAR-Template/util.h"
+#include "JAR-Template/PID.h"
+#include "JAR-Template/odom.h"
+#include "JAR-Template/drive.h"
 
 /**
  * Resets the constants for auton movement.
@@ -90,12 +95,12 @@ void full_test(){
 void odom_test(){
   chassis.set_coordinates(0, 0, 0);
   while(1){
-    pros::Screen::clearScreen();
-    pros::Screen::print(pros::E_TEXT_MEDIUM, 5,20, "X: %f", chassis.get_X_position());
-    pros::Screen::print(pros::E_TEXT_MEDIUM, 5,40, "Y: %f", chassis.get_Y_position());
-    pros::Screen::print(pros::E_TEXT_MEDIUM, 5,60, "Heading: %f", chassis.get_absolute_heading());
-    pros::Screen::print(pros::E_TEXT_MEDIUM, 5,80, "ForwardTracker: %f", chassis.get_ForwardTracker_position());
-    pros::Screen::print(pros::E_TEXT_MEDIUM, 5,100, "SidewaysTracker: %f", chassis.get_SidewaysTracker_position());
+    pros::screen::erase();
+    pros::screen::print(pros::E_TEXT_MEDIUM, 5,20, "X: %f", chassis.get_X_position());
+    pros::screen::print(pros::E_TEXT_MEDIUM, 5,40, "Y: %f", chassis.get_Y_position());
+    pros::screen::print(pros::E_TEXT_MEDIUM, 5,60, "Heading: %f", chassis.get_absolute_heading());
+    pros::screen::print(pros::E_TEXT_MEDIUM, 5,80, "ForwardTracker: %f", chassis.get_ForwardTracker_position());
+    pros::screen::print(pros::E_TEXT_MEDIUM, 5,100, "SidewaysTracker: %f", chassis.get_SidewaysTracker_position());
     pros::delay(20);
   }
 }

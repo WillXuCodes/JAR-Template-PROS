@@ -1,5 +1,6 @@
 #include "api.h"
 #include "odom.h"
+#include "util.h"
 
 /**
  * Setter method for tracker center distances.

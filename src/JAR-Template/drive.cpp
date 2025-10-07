@@ -2,6 +2,7 @@
 #include "drive.h"
 #include "util.h"
 #include "PID.h"
+#include "autons.h"
 
 /**
  * Drive constructor for the chassis.
@@ -28,7 +29,7 @@
  * @param SidewaysTracker_center_distance Vertical distance in inches.
  */
 
-Drive::Drive(enum::drive_setup drive_setup, pros::MotorGroup DriveL, pros::MotorGroup DriveR, 
+Drive::Drive(enum::jar_drive_setup drive_setup, pros::MotorGroup DriveL, pros::MotorGroup DriveR, 
 int gyro_port, float wheel_diameter, float wheel_ratio, float gyro_scale, 
 int DriveLF_port, int DriveRF_port, int DriveLB_port, int DriveRB_port, 
 int ForwardTracker_port, float ForwardTracker_diameter, float ForwardTracker_center_distance, 
@@ -61,7 +62,7 @@ int SidewaysTracker_port, float SidewaysTracker_diameter, float SidewaysTracker_
     DriveL.set_encoder_units_all( pros::MotorEncoderUnits::deg );
     DriveR.set_encoder_units_all( pros::MotorEncoderUnits::deg );
     DriveLF.set_encoder_units( pros::MotorEncoderUnits::deg );
-    
+
     if (drive_setup == TANK_ONE_FORWARD_ENCODER || drive_setup == TANK_ONE_FORWARD_ROTATION || drive_setup == ZERO_TRACKER_ODOM){
       odom.set_physical_distances(ForwardTracker_center_distance, 0);
     } 
